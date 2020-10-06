@@ -1,7 +1,11 @@
 import pygame
 import sys
+import time
 
-from maze import Maze
+
+from copy import deepcopy
+
+from maze import Maze, GBFMaze, AStarMaze
 
 pygame.init()
 
@@ -9,6 +13,7 @@ black = (0,0,0)
 white = (50,0,55)
 highlight = (200, 40, 0)
 path_color = (0, 200, 230)
+explored_color = (250, 165, 0)
 options_box = (150,150,150)
 button_color = (200,200,200)
 start_color = (30, 220, 15)
@@ -21,7 +26,10 @@ grid_position = (0, 0)
 
 size = width, height = 800, 600
 
+smallFont = pygame.font.Font("OpenSans-Regular.ttf", 18)
 mediumFont = pygame.font.Font("OpenSans-Regular.ttf", 28)
+
+algorithms = ["Breadth First Search", "Greedy Best-First", "A*"]
 
 class MazeInterface():
     def __init__(self):
@@ -33,24 +41,51 @@ class MazeInterface():
         self.end_cell = None
         self.empty_cells = []
         self.filled_cells = []
+        self.explored_cells = []
         self.wall_indices = []
         self.buttons = []
         self.path = []
         self.count = 0
         self.screen = pygame.display.set_mode(size)
         self.dragging = None
+        self.show_explored = True
+        self.algorithm = "Breadth First Search"
 
 
     def find_cell_under_coords(self, coords):
         for i in range(self.grid_size[1]):
             for j in range(self.grid_size[0]):
+                if self.empty_cells[i][j] and self.empty_cells[i][j].x % self.cell_size != 0:
+                    print("weird cell")
+                    print(i, j)
                 cell = self.empty_cells[i][j]
                 if cell and cell.collidepoint(coords):
+                    cell.x -= cell.x % self.cell_size
+                    cell.y -= cell.y % self.cell_size
                     return cell
         return None
 
+    def solve(self):
+        print(self.end)
+        if self.algorithm == "Breadth First Search":
+            maze = Maze(self.grid_size, self.start, self.end, self.wall_indices)
+        elif self.algorithm == "A*":
+            maze = AStarMaze(self.grid_size, self.start, self.end, self.wall_indices)
+        else:
+            maze = GBFMaze(self.grid_size, self.start, self.end, self.wall_indices)
+        self.path, self.count, self.explored_cells = maze.solve_maze()
+        print("length of path", len(self.path))
+        if self.path:
+            self.path = self.indices_to_rects(self.path)
+        if self.explored_cells:
+            self.explored_cells = self.indices_to_rects(self.explored_cells)
+
+        print("searched cells: ", self.count)
+
     def run_app(self):
         self.empty_cells = self.setup_grid()
+        self.empty_cells[self.start[0]][self.start[1]] = None
+        self.empty_cells[self.end[0]][self.end[1]] = None
 
         while True:
             mouse = pygame.mouse.get_pos()
@@ -73,18 +108,17 @@ class MazeInterface():
 
                     if self.dragging:
                         hovered_cell = self.find_cell_under_coords(mouse)
-                        print(hovered_cell)
                         if self.dragging == self.start_cell:
                             if not hovered_cell:
                                 self.start_cell = pygame.Rect(self.start[0] * self.cell_size, self.start[1] * self.cell_size, self.cell_size, self.cell_size)
                             else:
-                                self.start_cell = hovered_cell
                                 self.start = [hovered_cell.x / self.cell_size, hovered_cell.y / self.cell_size]
+                                self.start_cell = deepcopy(hovered_cell)
                         else:
                             if not hovered_cell:
                                 self.end_cell = pygame.Rect(self.end[0] * self.cell_size, self.end[1] * self.cell_size, self.cell_size, self.cell_size)
                             else:
-                                self.end_cell = hovered_cell
+                                self.end_cell = deepcopy(hovered_cell)
                                 self.end = [hovered_cell.x / self.cell_size, hovered_cell.y / self.cell_size]
                         hovered_cell = None
                     self.dragging = None
@@ -93,14 +127,7 @@ class MazeInterface():
                     for button in self.buttons:
                         if self.buttons[button].collidepoint(mouse):
                             if button == "Solve":
-                                maze = Maze(self.grid_size, self.start, self.end, self.wall_indices)
-                                self.path, self.count = maze.solve_maze()
-                                print("length of path", len(self.path))
-                                if self.path:
-                                    self.path = self.indices_to_rects(self.path)
-
-                                print("searched cells: ", self.count)
-
+                                self.solve()
                             elif button == "Clear":
                                 self.clear_grid()
                             elif button == "Grid Size":
@@ -114,6 +141,10 @@ class MazeInterface():
                                 print("changing grid size")
                                 self.change_grid_size(settings)
                                 self.clear_grid()
+                            elif button == "Show Explored" or button == "Hide Explored":
+                                self.show_explored = not self.show_explored
+                            elif button in algorithms:
+                                self.algorithm = algorithms[algorithms.index(button) - 1]
 
             self.screen.fill(black)
 
@@ -143,6 +174,7 @@ class MazeInterface():
         self.empty_cells = self.setup_grid()
         self.wall_indices = []
         self.filled_cells = []
+        self.explored_cells = []
         self.path = []
 
     def change_grid_size(self, size_settings):
@@ -163,6 +195,7 @@ class MazeInterface():
                 )
                 row.append(rect)
             grid.append(row)
+
         self.start_cell = pygame.Rect(self.start[0] * self.cell_size, self.start[1] * self.cell_size, self.cell_size, self.cell_size)
         self.end_cell = pygame.Rect(self.end[0] * self.cell_size, self.end[1] * self.cell_size, self.cell_size, self.cell_size)
         return grid
@@ -179,11 +212,17 @@ class MazeInterface():
                     )
                     pygame.draw.rect(self.screen, white, rect, 1)
 
+        if self.show_explored:
+            for cell in self.explored_cells:
+                pygame.draw.rect(self.screen, explored_color, cell)
+
         for cell in self.path:
             pygame.draw.rect(self.screen, path_color, cell)
 
         for cell in self.filled_cells:
             pygame.draw.rect(self.screen, highlight, cell)
+
+
 
         pygame.draw.rect(self.screen, end_color, self.end_cell)
         pygame.draw.rect(self.screen, start_color, self.start_cell)
@@ -200,8 +239,7 @@ class MazeInterface():
         pygame.draw.rect(self.screen, options_box, options_rect)
 
         buttons = {}
-        button_names = ["Solve", "Clear", "Grid Size"]
-
+        button_names = ["Solve", "Clear", "Grid Size", "Show Explored" if not self.show_explored else "Hide Explored", self.algorithm]
         button_size = (160, 60)
         button_top_margin = 20
 
@@ -214,8 +252,10 @@ class MazeInterface():
                         button_size[0],
                         button_size[1]
                         )
-
-            button_text = mediumFont.render(button_name, True, black)
+            if len(button_name) <= 12:
+                button_text = mediumFont.render(button_name, True, black)
+            else:
+                button_text = smallFont.render(button_name, True, black)
             text_rect = button_text.get_rect()
             text_rect.center = button.center
             pygame.draw.rect(self.screen, button_color, button)
@@ -230,8 +270,6 @@ class MazeInterface():
         for index in indices:
             rect_array.append(pygame.Rect(index[0] * self.cell_size, index[1] * self.cell_size, self.cell_size, self.cell_size))
         return rect_array
-
-
 
 if __name__ == "__main__":
     app = MazeInterface()
