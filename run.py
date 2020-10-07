@@ -5,12 +5,12 @@ import time
 
 from copy import deepcopy
 
-from maze import Maze, GBFMaze, AStarMaze
+from maze import Maze, GBFMaze, DFSMaze, AStarMaze
 
 pygame.init()
 
 black = (0,0,0)
-white = (50,0,55)
+white = (255,255,255)
 highlight = (200, 40, 0)
 path_color = (0, 200, 230)
 explored_color = (250, 165, 0)
@@ -26,10 +26,10 @@ grid_position = (0, 0)
 
 size = width, height = 800, 600
 
-smallFont = pygame.font.Font("OpenSans-Regular.ttf", 18)
+smallFont = pygame.font.Font("OpenSans-Regular.ttf", 16)
 mediumFont = pygame.font.Font("OpenSans-Regular.ttf", 28)
 
-algorithms = ["Breadth First Search", "Greedy Best-First", "A*"]
+algorithms = ["Breadth First Search", "Greedy Best-First", "A*", "Depth First Search"]
 
 class MazeInterface():
     def __init__(self):
@@ -66,11 +66,12 @@ class MazeInterface():
         return None
 
     def solve(self):
-        print(self.end)
         if self.algorithm == "Breadth First Search":
             maze = Maze(self.grid_size, self.start, self.end, self.wall_indices)
         elif self.algorithm == "A*":
             maze = AStarMaze(self.grid_size, self.start, self.end, self.wall_indices)
+        elif self.algorithm == "Depth First Search":
+            maze = DFSMaze(self.grid_size, self.start, self.end, self.wall_indices)
         else:
             maze = GBFMaze(self.grid_size, self.start, self.end, self.wall_indices)
         self.path, self.count, self.explored_cells = maze.solve_maze()
@@ -99,11 +100,11 @@ class MazeInterface():
                         self.dragging = self.end_cell
                 elif event.type == pygame.MOUSEMOTION:
                     if self.dragging == self.start_cell:
-                        self.start_cell.x = mouse[0]
-                        self.start_cell.y = mouse[1]
+                        self.start_cell.x = mouse[0] - .5 * self.cell_size
+                        self.start_cell.y = mouse[1] - .5 * self.cell_size
                     elif self.dragging == self.end_cell:
-                        self.end_cell.x = mouse[0]
-                        self.end_cell.y = mouse[1]
+                        self.end_cell.x = mouse[0] - .5 * self.cell_size
+                        self.end_cell.y = mouse[1] - .5 * self.cell_size
                 elif event.type == pygame.MOUSEBUTTONUP:
 
                     if self.dragging:
@@ -225,7 +226,18 @@ class MazeInterface():
 
 
         pygame.draw.rect(self.screen, end_color, self.end_cell)
+
+        cell_symbol = smallFont.render("E", True, white)
+        text_rect = cell_symbol.get_rect()
+        text_rect.center = self.end_cell.center
+        self.screen.blit(cell_symbol, text_rect)
+
         pygame.draw.rect(self.screen, start_color, self.start_cell)
+
+        cell_symbol = smallFont.render("S", True, white)
+        text_rect = cell_symbol.get_rect()
+        text_rect.center = self.start_cell.center
+        self.screen.blit(cell_symbol, text_rect)
 
 
     def draw_options(self):
