@@ -8,6 +8,7 @@ from copy import deepcopy
 from maze import Maze, GBFMaze, DFSMaze, AStarMaze
 
 pygame.init()
+pygame.display.set_caption("Maze Solver")
 
 black = (0,0,0)
 white = (255,255,255)
