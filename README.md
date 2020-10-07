@@ -6,3 +6,13 @@
 - Depth First Search
 - Breadth First Search
 - Greedy Best First Search
+
+### To run the program:
+
+`
+pip install -r requirements.txt
+`
+
+`
+python run.py
+`
